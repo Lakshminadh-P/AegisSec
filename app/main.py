@@ -34,7 +34,7 @@ async def lifespan(app: FastAPI):
     """Application startup and shutdown events."""
     # Startup: Initialize database and load sample data
     print("\n" + "="*60)
-    print("  🛡️  AegisSec — DevSecOps Security Platform")
+    print("  [AegisSec]  DevSecOps Security Platform")
     print("  Starting up...")
     print("="*60)
     
@@ -48,7 +48,7 @@ async def lifespan(app: FastAPI):
     yield
     
     # Shutdown
-    print("\n🛡️ AegisSec shutting down...")
+    print("\n[AegisSec] shutting down...")
 
 
 # Create FastAPI application
@@ -78,65 +78,20 @@ app.include_router(events.router)
 
 # Serve frontend static files
 frontend_dir = os.path.join(os.path.dirname(os.path.dirname(__file__)), "frontend")
-if os.path.exists(frontend_dir):
-    app.mount("/static", StaticFiles(directory=frontend_dir), name="static")
-
-
-# --- Frontend page routes ---
 
 @app.get("/")
 def root():
     """Redirect to login page."""
-    return RedirectResponse(url="/login")
-
-
-@app.get("/login")
-def login_page():
-    """Serve login page."""
-    return FileResponse(os.path.join(frontend_dir, "login.html"))
-
-
-@app.get("/dashboard")
-def dashboard_page():
-    """Serve dashboard page."""
-    return FileResponse(os.path.join(frontend_dir, "dashboard.html"))
-
-
-@app.get("/vulnerabilities")
-def vulnerabilities_page():
-    """Serve vulnerabilities page."""
-    return FileResponse(os.path.join(frontend_dir, "vulnerabilities.html"))
-
-
-@app.get("/scans")
-def scans_page():
-    """Serve scans page."""
-    return FileResponse(os.path.join(frontend_dir, "scans.html"))
-
-
-@app.get("/reports")
-def reports_page():
-    """Serve reports page."""
-    return FileResponse(os.path.join(frontend_dir, "reports.html"))
-
-
-@app.get("/events")
-def events_page():
-    """Serve security events page."""
-    return FileResponse(os.path.join(frontend_dir, "events.html"))
-
-
-@app.get("/settings")
-def settings_page():
-    """Serve settings page."""
-    return FileResponse(os.path.join(frontend_dir, "settings.html"))
-
+    return RedirectResponse(url="/login.html")
 
 # Health check endpoint
 @app.get("/health")
 def health_check():
     """Health check endpoint for monitoring."""
     return {"status": "healthy", "app": "AegisSec", "version": "1.0.0"}
+
+if os.path.exists(frontend_dir):
+    app.mount("/", StaticFiles(directory=frontend_dir, html=True), name="frontend")
 
 
 if __name__ == "__main__":
