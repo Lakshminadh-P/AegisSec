@@ -1,0 +1,16 @@
+# AegisSec ConfigMap
+# Stores non-sensitive configuration
+# NEVER put secrets (passwords, API keys) in ConfigMaps
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: aegissec-config
+  labels:
+    app: aegissec
+data:
+  APP_NAME: "AegisSec"
+  APP_ENV: "production"
+  DEBUG: "false"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  DATABASE_URL: "sqlite:///./aegissec.db"

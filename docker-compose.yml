@@ -1,0 +1,89 @@
+# AegisSec Docker Compose
+# Run: docker-compose up --build
+#
+# This configuration demonstrates:
+# - Multi-container application setup
+# - Environment variable configuration
+# - Health checks
+# - Network isolation
+# - Volume persistence
+
+version: '3.8'
+
+services:
+  # Main Application
+  aegissec:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - APP_ENV=production
+      - DEBUG=false
+      - SECRET_KEY=${SECRET_KEY:-change-me-in-production}
+      - DATABASE_URL=sqlite:///./aegissec.db
+    volumes:
+      - app-data:/app/data
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/health')"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    restart: unless-stopped
+    networks:
+      - aegissec-network
+
+  # Vulnerable Lab (for DAST testing) — EDUCATIONAL USE ONLY
+  vulnerable-lab:
+    build:
+      context: ./vulnerable-lab
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - FLASK_ENV=development
+    networks:
+      - aegissec-network
+    # WARNING: This container is INTENTIONALLY VULNERABLE
+    # Only run locally for educational purposes
+
+  # Optional: Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    networks:
+      - aegissec-network
+    profiles:
+      - monitoring
+
+  # Optional: Grafana Dashboard
+  grafana:
+    image: grafana/grafana:10.1.0
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    networks:
+      - aegissec-network
+    profiles:
+      - monitoring
+
+volumes:
+  app-data:
+  prometheus-data:
+  grafana-data:
+
+networks:
+  aegissec-network:
+    driver: bridge

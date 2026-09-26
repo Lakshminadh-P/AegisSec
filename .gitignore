@@ -1,0 +1,57 @@
+# AegisSec .gitignore
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+venv/
+env/
+.venv/
+*.egg-info/
+dist/
+build/
+
+# Environment
+.env
+*.env
+!.env.example
+!demo-secrets/fake-credentials.env
+
+# Database
+*.db
+*.sqlite3
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Terraform
+.terraform/
+*.tfstate
+*.tfstate.backup
+*.tfvars
+!*.tfvars.example
+
+# Reports
+*.json.report
+security-report.*
+
+# Docker
+*.log
+
+# Coverage
+.coverage
+htmlcov/
+
+# Secrets (NEVER commit these)
+*.pem
+*.key
+*.crt
+id_rsa

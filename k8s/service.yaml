@@ -1,0 +1,25 @@
+# AegisSec Kubernetes Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: aegissec-service
+  labels:
+    app: aegissec
+spec:
+  type: ClusterIP  # Internal access only — use Ingress for external
+  ports:
+    - port: 80
+      targetPort: 8000
+      protocol: TCP
+      name: http
+  selector:
+    app: aegissec
+
+---
+# Service Account with minimal permissions
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: aegissec-sa
+  labels:
+    app: aegissec

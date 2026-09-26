@@ -1,0 +1,87 @@
+# AegisSec Kubernetes Deployment
+# Security best practices demonstrated:
+# 1. Non-root container
+# 2. Resource limits (prevent resource abuse)
+# 3. Read-only root filesystem
+# 4. Security context
+# 5. Liveness and readiness probes
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: aegissec
+  labels:
+    app: aegissec
+    tier: backend
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: aegissec
+  template:
+    metadata:
+      labels:
+        app: aegissec
+        tier: backend
+    spec:
+      # Security: Don't use default service account
+      serviceAccountName: aegissec-sa
+      containers:
+        - name: aegissec
+          image: aegissec:latest
+          ports:
+            - containerPort: 8000
+          
+          # Environment variables from ConfigMap and Secrets
+          envFrom:
+            - configMapRef:
+                name: aegissec-config
+            - secretRef:
+                name: aegissec-secrets
+          
+          # Resource limits — prevents resource exhaustion attacks
+          resources:
+            requests:
+              memory: "128Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          
+          # Security Context — principle of least privilege
+          securityContext:
+            runAsNonRoot: true
+            runAsUser: 1000
+            readOnlyRootFilesystem: true
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+                - ALL
+          
+          # Health checks
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 30
+          
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          
+          # Writable directories (since root filesystem is read-only)
+          volumeMounts:
+            - name: tmp-volume
+              mountPath: /tmp
+            - name: data-volume
+              mountPath: /app/data
+      
+      volumes:
+        - name: tmp-volume
+          emptyDir: {}
+        - name: data-volume
+          emptyDir: {}

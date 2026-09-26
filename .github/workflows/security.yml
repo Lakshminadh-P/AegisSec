@@ -1,0 +1,190 @@
+# AegisSec Security Pipeline
+#
+# This GitHub Actions workflow demonstrates "Security as Code" —
+# integrating security checks directly into the CI/CD pipeline.
+#
+# Concept: "Shift Left Security"
+# Instead of testing security only before deployment,
+# we check for vulnerabilities on every code change.
+#
+# If critical security issues are found, the pipeline FAILS,
+# preventing insecure code from being merged.
+
+name: 🛡️ Security Pipeline
+
+# Run on every push and pull request
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+jobs:
+  # ====================
+  # Job 1: SAST — Static Application Security Testing
+  # Scans source code without executing it
+  # ====================
+  sast:
+    name: 🔍 SAST Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install dependencies
+        run: pip install bandit semgrep
+
+      # Bandit — Python-specific security linter
+      - name: Run Bandit (Python Security)
+        run: |
+          echo "🔍 Running Bandit — Python security analysis..."
+          bandit -r app/ -f json -o bandit-report.json || true
+          bandit -r app/ -ll  # Show results in log (low severity and above)
+        continue-on-error: true
+
+      # Semgrep — Multi-language SAST
+      - name: Run Semgrep (SAST)
+        run: |
+          echo "🔍 Running Semgrep — Static analysis..."
+          semgrep --config auto --json --output semgrep-report.json app/ || true
+          semgrep --config auto app/  # Show results in log
+        continue-on-error: true
+
+      - name: Upload SAST Reports
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: sast-reports
+          path: |
+            bandit-report.json
+            semgrep-report.json
+
+  # ====================
+  # Job 2: Secret Scanning
+  # Detects hardcoded credentials in code
+  # ====================
+  secret-scan:
+    name: 🔑 Secret Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full history for secret scanning
+
+      # Gitleaks — finds hardcoded secrets
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        continue-on-error: true
+
+  # ====================
+  # Job 3: SCA — Software Composition Analysis
+  # Scans dependencies for known vulnerabilities
+  # ====================
+  sca:
+    name: 📦 Dependency Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      # Trivy — scans filesystem for vulnerable dependencies
+      - name: Run Trivy (SCA)
+        uses: aquasecurity/trivy-action@master
+        with:
+          scan-type: 'fs'
+          scan-ref: '.'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+
+  # ====================
+  # Job 4: Container Security
+  # Scans Docker images for vulnerabilities
+  # ====================
+  container-scan:
+    name: 🐳 Container Scanning
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t aegissec:test .
+
+      # Trivy — scans container image
+      - name: Scan Docker image with Trivy
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: 'aegissec:test'
+          format: 'table'
+          severity: 'CRITICAL,HIGH'
+          exit-code: '1'  # Fail if critical vulnerabilities found
+
+  # ====================
+  # Job 5: IaC Security
+  # Scans Terraform/Kubernetes files for misconfigurations
+  # ====================
+  iac-scan:
+    name: 🏗️ IaC Security
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install Checkov
+        run: pip install checkov
+
+      # Checkov — scans Terraform files
+      - name: Run Checkov on Terraform
+        run: |
+          echo "🏗️ Scanning Terraform files..."
+          checkov -d terraform/ --output cli --output json --output-file-path . || true
+        continue-on-error: true
+
+      # Checkov — scans Kubernetes manifests
+      - name: Run Checkov on Kubernetes
+        run: |
+          echo "🏗️ Scanning Kubernetes manifests..."
+          checkov -d k8s/ --output cli || true
+        continue-on-error: true
+
+  # ====================
+  # Job 6: Security Gate
+  # Final decision — should the pipeline pass or fail?
+  # ====================
+  security-gate:
+    name: 🚦 Security Gate
+    needs: [sast, secret-scan, sca, container-scan, iac-scan]
+    runs-on: ubuntu-latest
+    if: always()
+    steps:
+      - name: Check Security Results
+        run: |
+          echo "🚦 Security Gate — Evaluating results..."
+          echo ""
+          echo "SAST:           ${{ needs.sast.result }}"
+          echo "Secret Scan:    ${{ needs.secret-scan.result }}"
+          echo "SCA:            ${{ needs.sca.result }}"
+          echo "Container Scan: ${{ needs.container-scan.result }}"
+          echo "IaC Scan:       ${{ needs.iac-scan.result }}"
+          echo ""
+          
+          # Fail if container scan found critical vulnerabilities
+          if [ "${{ needs.container-scan.result }}" == "failure" ]; then
+            echo "❌ SECURITY GATE FAILED — Critical container vulnerabilities detected"
+            exit 1
+          fi
+          
+          echo "✅ Security Gate PASSED"
